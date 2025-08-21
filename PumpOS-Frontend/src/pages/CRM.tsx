@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -5,9 +6,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
 import { UserPlus, Target, TrendingUp, Phone, Mail, Calendar, Search, Filter, Plus, Eye, Edit, MessageSquare } from "lucide-react";
 
 const CRM = () => {
+  const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
   const kpiData = [
     { title: "Total Leads", value: "847", change: "+15.3%", icon: UserPlus, trend: "up" },
     { title: "Conversion Rate", value: "24.5%", change: "+3.2%", icon: Target, trend: "up" },
@@ -95,21 +101,26 @@ const CRM = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">CRM & Leads</h1>
-          <p className="text-muted-foreground">Manage leads, track conversions, and nurture prospects</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm">
-            <Target className="h-4 w-4 mr-2" />
-            Lead Scoring
-          </Button>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Add Lead
-          </Button>
+    <div className="space-y-8 p-6">
+      {/* Enhanced Header */}
+      <div className="relative bg-gradient-to-br from-primary/10 via-accent/5 to-background rounded-xl border border-border/50 p-6">
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+          <div className="space-y-2">
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              CRM & Leads
+            </h1>
+            <p className="text-muted-foreground text-lg">Manage leads, track conversions, and nurture prospects</p>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            <Button variant="outline" className="shadow-sm hover:shadow-md transition-all">
+              <Target className="h-4 w-4 mr-2" />
+              Lead Scoring
+            </Button>
+            <Button className="shadow-md hover:shadow-lg transition-all bg-gradient-to-r from-primary to-accent">
+              <Plus className="h-4 w-4 mr-2" />
+              Add Lead
+            </Button>
+          </div>
         </div>
       </div>
 
