@@ -2,6 +2,7 @@
 
 ## To view Frontend for PUMPOS
 
-```
-bash front.sh
+```bash 
+./front.sh
+./app.sh
 ```
