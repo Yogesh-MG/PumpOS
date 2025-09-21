@@ -5,4 +5,5 @@ In The Bash terminal Run the following commands to run the application
 ```bash 
 ./front.sh
 ./app.sh
+./backend.sh
 ```
