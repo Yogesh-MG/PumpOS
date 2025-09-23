@@ -53,6 +53,7 @@ class Member(models.Model):
     phone = models.CharField(max_length=20, blank=True, null=True)
     membership_plan = models.ForeignKey(MembershipPlan, on_delete=models.SET_NULL, null=True)
     classes = models.ManyToManyField(Class, blank=True)
+    face_embedding = models.JSONField(default=list, blank=True)
     join_date = models.DateField()
     last_visit = models.DateField(blank=True, null=True)
     status = models.CharField(max_length=20, choices=[
@@ -84,6 +85,7 @@ class Activity(models.Model):
     title = models.CharField(max_length=100)
     timestamp = models.DateTimeField()
     location = models.CharField(max_length=100)
+    confidence = models.FloatField(default=0.0)
     duration = models.CharField(max_length=20)  # e.g., "2h 15m"
 
     def __str__(self):

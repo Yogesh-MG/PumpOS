@@ -12,17 +12,17 @@ import api from "@/utils/api";
 
 interface LiveCheckin {
   id: number;
-  member: string; // Derived from member.user.first_name + last_name
-  timestamp: string; // ISO format
+  member: string;
+  timestamp: string;
   type: 'check-in' | 'check-out';
   location: string;
   duration: string;
-  confidence?: number; // Optional, as not all systems may provide this
+  confidence?: number;
   avatar?: string;
 }
 
 interface AttendanceHistory {
-  date: string; // ISO format
+  date: string;
   totalVisits: number;
   peakHour: string;
   avgDuration: string;
@@ -150,7 +150,7 @@ export default function Attendance() {
         <KPICard
           title="Today's Check-ins"
           value={isLoading ? '...' : data.kpi.todaysCheckins.toString()}
-          change={{ value: '+12', type: 'increase' }} // Update with backend data if available
+          change={{ value: '+12', type: 'increase' }}
           icon={UserCheck}
           description="vs yesterday"
         />
@@ -169,7 +169,7 @@ export default function Attendance() {
         <KPICard
           title="Avg Duration"
           value={isLoading ? '...' : data.kpi.avgDuration}
-          change={{ value: '+8m', type: 'increase' }} // Update with backend data if available
+          change={{ value: '+8m', type: 'increase' }}
           icon={Calendar}
           description="Per visit"
         />

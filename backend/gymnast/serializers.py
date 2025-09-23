@@ -28,9 +28,15 @@ class ClassSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'description', 'instructor', 'schedule', 'duration_minutes', 'capacity', 'created_at']
 
 class ActivitySerializer(serializers.ModelSerializer):
+    member = serializers.PrimaryKeyRelatedField(queryset=Member.objects.all())
+    member_name = serializers.SerializerMethodField()
+    
     class Meta:
         model = Activity
-        fields = ['id', 'type', 'title', 'timestamp', 'location', 'duration']
+        fields = ['id', 'member', 'member_name', 'type', 'title', 'timestamp', 'location', 'duration', 'confidence']
+    
+    def get_member_name(self, obj):
+        return obj.member.user.username
 
 class BookingSerializer(serializers.ModelSerializer):
     class_instance = ClassSerializer(read_only=True)

@@ -13,6 +13,8 @@ from .views import (
     AchievementListCreateView,
     MessageListCreateView,
     AttendanceSummaryView,
+    FaceRecognitionView,
+    SaveFaceEmbeddingView
 )
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
@@ -32,4 +34,6 @@ urlpatterns = [
     path('token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('token/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('attendance-summary/', AttendanceSummaryView.as_view(), name='attendance_summary'),
+    path('face-recognition/', FaceRecognitionView.as_view(), name='face_recognition'),
+    path('save-face-embedding/', SaveFaceEmbeddingView.as_view(), name='save_face_embedding'),
 ]

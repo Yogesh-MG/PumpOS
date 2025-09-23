@@ -97,7 +97,9 @@ export const EditMemberDialog = ({ member, trigger }: EditMemberDialogProps) => 
         emergency_phone: formData.emergencyPhone || null,
         date_of_birth: formData.dateOfBirth || null,
         gender: formData.gender || null,
-      });
+      }, {
+          headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
+        });
       toast({
         title: "Member Updated",
         description: `${formData.firstName} ${formData.lastName}'s profile has been updated successfully!`,

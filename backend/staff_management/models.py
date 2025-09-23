@@ -9,7 +9,7 @@ class StaffMember(models.Model):
         ('on-leave', 'On Leave'),
         ('inactive', 'Inactive'),
     ]
-    staff_id = models.CharField(max_length=20, unique=True)
+    staff_id = models.CharField(max_length=50, unique=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='staff_profile')
     role = models.CharField(max_length=100)
     department = models.CharField(max_length=100)

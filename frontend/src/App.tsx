@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import Attendance_cap from "@/components/members/attendance_cap";
 import Hero from "./pages/Hero";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -41,6 +42,11 @@ const App = () => (
           <Route path="/attendance" element={
             <DashboardLayout>
               <Attendance />
+            </DashboardLayout>
+          } />
+          <Route path="/attendance_cap" element={
+            <DashboardLayout>
+              <Attendance_cap />
             </DashboardLayout>
           } />
           <Route path="/bookings" element={
