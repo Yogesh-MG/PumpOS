@@ -1,5 +1,7 @@
 import { useState } from "react";
-import { Users, DollarSign, UserCheck, TrendingUp, Activity, Calendar, Target, Zap, Plus, ArrowRight } from "lucide-react";
+import { Users, DollarSign, UserCheck, TrendingUp, Activity, Calendar, Target, Zap, Plus, ArrowRight, CreditCard, Bell } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 import { KPICard } from "@/components/dashboard/KPICard";
 import { RevenueChart, AttendanceChart } from "@/components/dashboard/DashboardChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,6 +54,8 @@ const upcomingClasses = [
 
 export default function Dashboard() {
   const [timeRange, setTimeRange] = useState("7d");
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
   return (
     <div className="space-y-8 p-6">
@@ -224,7 +228,16 @@ export default function Dashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="group p-6 border rounded-xl hover:shadow-md transition-all duration-300 cursor-pointer hover:scale-105 bg-gradient-to-br from-background to-muted/20">
+            <div 
+              className="group p-6 border rounded-xl hover:shadow-md transition-all duration-300 cursor-pointer hover:scale-105 bg-gradient-to-br from-background to-muted/20"
+              onClick={() => {
+                toast({
+                  title: "Add Member",
+                  description: "Redirecting to member registration...",
+                });
+                navigate('/members');
+              }}
+            >
               <div className="flex items-center space-x-3 mb-3">
                 <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
                   <Users className="h-5 w-5 text-primary" />
@@ -233,7 +246,15 @@ export default function Dashboard() {
               </div>
               <p className="text-sm text-muted-foreground">Register new member</p>
             </div>
-            <div className="group p-6 border rounded-xl hover:shadow-md transition-all duration-300 cursor-pointer hover:scale-105 bg-gradient-to-br from-background to-muted/20">
+            <div 
+              className="group p-6 border rounded-xl hover:shadow-md transition-all duration-300 cursor-pointer hover:scale-105 bg-gradient-to-br from-background to-muted/20"
+              onClick={() => {
+                toast({
+                  title: "Check-in Member",
+                  description: "Opening check-in interface...",
+                });
+              }}
+            >
               <div className="flex items-center space-x-3 mb-3">
                 <div className="p-2 rounded-lg bg-success/10 group-hover:bg-success/20 transition-colors">
                   <UserCheck className="h-5 w-5 text-success" />
@@ -242,7 +263,16 @@ export default function Dashboard() {
               </div>
               <p className="text-sm text-muted-foreground">Manual check-in</p>
             </div>
-            <div className="group p-6 border rounded-xl hover:shadow-md transition-all duration-300 cursor-pointer hover:scale-105 bg-gradient-to-br from-background to-muted/20">
+            <div 
+              className="group p-6 border rounded-xl hover:shadow-md transition-all duration-300 cursor-pointer hover:scale-105 bg-gradient-to-br from-background to-muted/20"
+              onClick={() => {
+                toast({
+                  title: "Create Class",
+                  description: "Opening class creation...",
+                });
+                navigate('/bookings');
+              }}
+            >
               <div className="flex items-center space-x-3 mb-3">
                 <div className="p-2 rounded-lg bg-accent/10 group-hover:bg-accent/20 transition-colors">
                   <Calendar className="h-5 w-5 text-accent" />
@@ -251,7 +281,16 @@ export default function Dashboard() {
               </div>
               <p className="text-sm text-muted-foreground">Schedule new class</p>
             </div>
-            <div className="group p-6 border rounded-xl hover:shadow-md transition-all duration-300 cursor-pointer hover:scale-105 bg-gradient-to-br from-background to-muted/20">
+            <div 
+              className="group p-6 border rounded-xl hover:shadow-md transition-all duration-300 cursor-pointer hover:scale-105 bg-gradient-to-br from-background to-muted/20"
+              onClick={() => {
+                toast({
+                  title: "Process Payment",
+                  description: "Opening payment processing...",
+                });
+                navigate('/sales');
+              }}
+            >
               <div className="flex items-center space-x-3 mb-3">
                 <div className="p-2 rounded-lg bg-warning/10 group-hover:bg-warning/20 transition-colors">
                   <DollarSign className="h-5 w-5 text-warning" />

@@ -5,11 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, User, Mail, Phone, Calendar, MapPin, CreditCard, Camera } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import api from "@/utils/api";
-import { Badge } from "@/components/ui/badge";
 
 interface MembershipPlan {
   id: number;
@@ -45,12 +45,15 @@ export const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onMemberAdded 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [isCapturingFace, setIsCapturingFace] = useState(false);
   const [faceCaptured, setFaceCaptured] = useState(false);
+  const [capturedImageData, setCapturedImageData] = useState<string | null>(null); // Store image data in state
 
   useEffect(() => {
     const fetchMembershipPlans = async () => {
       try {
-        const response = await api.get("/api/membership-plans/");
-        setMembershipPlans(response.data);
+        const response = await api.get("/api/membership-plans/", {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
+        setMembershipPlans(response.data.results);
       } catch (error: any) {
         toast({
           title: "Error",
@@ -95,8 +98,8 @@ export const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onMemberAdded 
     }
   };
 
-  // Capture Face and Save Embedding
-  const captureFaceAndSave = async () => {
+  // Capture Face (store image data, don't save yet)
+  const captureFace = () => {
     if (!videoRef.current || !canvasRef.current) return;
 
     const canvas = canvasRef.current;
@@ -106,31 +109,19 @@ export const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onMemberAdded 
       canvas.height = videoRef.current.videoHeight;
       ctx.drawImage(videoRef.current, 0, 0);
       const imageData = canvas.toDataURL("image/jpeg", 0.8);
+      setCapturedImageData(imageData);
+      setFaceCaptured(true);
 
-      try {
-        const response = await api.post("/api/save-face-embedding/", {
-          member_id: "temp_id",  // Will be replaced after member creation
-          image: imageData,
-        },{
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-          });
-        toast({
-          title: "Face Registered!",
-          description: response.data.message,
-        });
-        setFaceCaptured(true);
-        // Stop stream
-        if (videoRef.current.srcObject) {
-          (videoRef.current.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
-        }
-        setIsCapturingFace(false);
-      } catch (error: any) {
-        toast({
-          title: "Embedding Error",
-          description: error.response?.data?.error || "Failed to register face.",
-          variant: "destructive",
-        });
+      toast({
+        title: "Face Captured!",
+        description: "Face image ready for registration.",
+      });
+
+      // Stop stream
+      if (videoRef.current.srcObject) {
+        (videoRef.current.srcObject as MediaStream).getTracks().forEach((track) => track.stop());
       }
+      setIsCapturingFace(false);
     }
   };
 
@@ -152,23 +143,20 @@ export const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onMemberAdded 
         date_of_birth: formData.dateOfBirth || null,
         gender: formData.gender || null,
         status: "Active",
-      },{
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      }, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
       });
 
       const memberId = memberResponse.data.id;
 
       // If face was captured, save embedding for the new member
-      if (faceCaptured) {
-        const imageData = canvasRef.current?.toDataURL("image/jpeg", 0.8);
-        if (imageData) {
-          await api.post("/api/save-face-embedding/", {
-            member_id: memberId,  // Use the new member ID
-            image: imageData,
-          }, {
-            headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-          });
-        }
+      if (capturedImageData) {
+        await api.post("/api/save-face-embedding/", {
+          member_id: memberId,
+          image: capturedImageData,
+        }, {
+          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+        });
       }
 
       toast({
@@ -189,6 +177,7 @@ export const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onMemberAdded 
         gender: "",
       });
       setFaceCaptured(false);
+      setCapturedImageData(null);
       setOpen(false);
       if (onMemberAdded) onMemberAdded();
     } catch (error: any) {
@@ -213,43 +202,90 @@ export const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onMemberAdded 
           Add Member
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto animate-fade-in">
         <DialogHeader>
-          <DialogTitle>Add New Member</DialogTitle>
+          <DialogTitle className="flex items-center gap-2 text-xl">
+            <Plus className="h-5 w-5 text-primary" />
+            Add New Member
+          </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {/* Existing fields... */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="firstName">First Name</Label>
-              <Input
-                id="firstName"
-                value={formData.firstName}
-                onChange={handleChange}
-                required
-                disabled={isSubmitting}
-              />
+        
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b">
+              <User className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold">Personal Information</h3>
             </div>
-            <div>
-              <Label htmlFor="lastName">Last Name</Label>
-              <Input
-                id="lastName"
-                value={formData.lastName}
-                onChange={handleChange}
-                required
-                disabled={isSubmitting}
-              />
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstName">First Name</Label>
+                <Input 
+                  id="firstName" 
+                  value={formData.firstName}
+                  onChange={handleChange}
+                  className="transition-all duration-200 focus:scale-[1.02]"
+                  required 
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastName">Last Name</Label>
+                <Input 
+                  id="lastName" 
+                  value={formData.lastName}
+                  onChange={handleChange}
+                  className="transition-all duration-200 focus:scale-[1.02]"
+                  required 
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="dateOfBirth">Date of Birth</Label>
+                <Input 
+                  id="dateOfBirth" 
+                  type="date"
+                  value={formData.dateOfBirth}
+                  onChange={handleChange}
+                  className="transition-all duration-200 focus:scale-[1.02]"
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="gender">Gender</Label>
+                <Select 
+                  value={formData.gender} 
+                  onValueChange={handleGenderChange}
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger className="transition-all duration-200 focus:scale-[1.02]">
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="male">Male</SelectItem>
+                    <SelectItem value="female">Female</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="prefer-not-to-say">Prefer not to say</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </div>
 
           {/* Face Registration Section */}
-          <div className="border rounded-lg p-4">
-            <Label className="text-lg font-semibold mb-2 block">Face Registration (for Automatic Check-in)</Label>
-            <div className="space-y-2">
-              <p className="text-sm text-muted-foreground">Capture a clear front-facing photo for face recognition.</p>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b">
+              <Camera className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold">Face Registration (for Automatic Check-in)</h3>
+            </div>
+            <div className="border rounded-lg p-4">
+              <p className="text-sm text-muted-foreground mb-4">Capture a clear front-facing photo for face recognition.</p>
               {!isCapturingFace ? (
-                <Button onClick={startFaceCapture} variant="outline">
-                  Capture Face
+                <Button onClick={startFaceCapture} variant="outline" disabled={faceCaptured || isSubmitting}>
+                  {faceCaptured ? "Face Already Captured" : "Capture Face"}
                 </Button>
               ) : (
                 <div className="text-center">
@@ -262,7 +298,7 @@ export const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onMemberAdded 
                   />
                   <canvas ref={canvasRef} style={{ display: 'none' }} />
                   <div className="flex gap-2 justify-center mt-4">
-                    <Button onClick={captureFaceAndSave}>
+                    <Button onClick={captureFace} disabled={isSubmitting}>
                       Capture & Register
                     </Button>
                     <Button variant="outline" onClick={() => {
@@ -270,57 +306,164 @@ export const AddMemberDialog: React.FC<AddMemberDialogProps> = ({ onMemberAdded 
                         (videoRef.current.srcObject as MediaStream).getTracks().forEach(track => track.stop());
                       }
                       setIsCapturingFace(false);
-                    }}>
+                    }} disabled={isSubmitting}>
                       Cancel
                     </Button>
                   </div>
                 </div>
               )}
               {faceCaptured && (
-                <Badge variant="default" className="bg-success text-success-foreground">
+                <Badge variant="default" className="bg-success text-success-foreground mt-2">
                   Face registered successfully!
                 </Badge>
               )}
             </div>
           </div>
 
-          {/* Other existing fields... */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                disabled={isSubmitting}
-              />
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b">
+              <Mail className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold">Contact Information</h3>
             </div>
-            <div>
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                type="tel"
-                value={formData.phone}
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input 
+                  id="email" 
+                  type="email" 
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="transition-all duration-200 focus:scale-[1.02]"
+                  required 
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">Phone</Label>
+                <Input 
+                  id="phone" 
+                  type="tel" 
+                  value={formData.phone}
+                  onChange={handleChange}
+                  className="transition-all duration-200 focus:scale-[1.02]"
+                  required 
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="address">Address</Label>
+              <Textarea 
+                id="address" 
+                value={formData.address}
                 onChange={handleChange}
-                required
+                className="transition-all duration-200 focus:scale-[1.02]"
+                placeholder="Enter full address" 
                 disabled={isSubmitting}
               />
             </div>
           </div>
 
-          {/* Rest of form... */}
-          <div className="flex justify-end gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b">
+              <Phone className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold">Emergency Contact</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="emergencyContact">Emergency Contact Name</Label>
+                <Input 
+                  id="emergencyContact" 
+                  value={formData.emergencyContact}
+                  onChange={handleChange}
+                  className="transition-all duration-200 focus:scale-[1.02]"
+                  placeholder="Contact name" 
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="emergencyPhone">Emergency Phone</Label>
+                <Input 
+                  id="emergencyPhone" 
+                  type="tel" 
+                  value={formData.emergencyPhone}
+                  onChange={handleChange}
+                  className="transition-all duration-200 focus:scale-[1.02]"
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <div className="flex items-center gap-2 pb-2 border-b">
+              <CreditCard className="h-4 w-4 text-primary" />
+              <h3 className="font-semibold">Membership Information</h3>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="joinDate">Join Date</Label>
+                <Input 
+                  id="joinDate" 
+                  type="date"
+                  value={formData.joinDate}
+                  onChange={handleChange}
+                  className="transition-all duration-200 focus:scale-[1.02]"
+                  required
+                  disabled={isSubmitting}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="membershipType">Membership Type</Label>
+                <Select 
+                  value={formData.membershipType} 
+                  onValueChange={handleMembershipChange}
+                  disabled={isSubmitting || membershipPlans.length === 0}
+                >
+                  <SelectTrigger className="transition-all duration-200 focus:scale-[1.02]">
+                    <SelectValue placeholder="Select membership" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {membershipPlans.map((plan) => (
+                      <SelectItem key={plan.id} value={plan.id.toString()}>
+                        {plan.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="p-4 bg-muted/50 rounded-lg border">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">Initial Status:</span>
+                <Badge className="bg-success/10 text-success">
+                  Active
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-6 border-t">
+            <Button 
+              type="button" 
+              variant="outline" 
               onClick={() => setOpen(false)}
+              className="hover:scale-105 transition-all duration-200"
               disabled={isSubmitting}
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button 
+              type="submit"
+              className="hover:scale-105 transition-all duration-200 bg-gradient-to-r from-primary to-accent"
+              disabled={isSubmitting}
+            >
+              <Plus className="h-4 w-4 mr-2" />
               {isSubmitting ? "Adding..." : "Add Member"}
             </Button>
           </div>

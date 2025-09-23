@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Label } from "@/components/ui/label";
 import { 
   User, 
   Mail, 
@@ -44,7 +45,7 @@ interface Member {
   emergency_phone?: string;
   date_of_birth?: string;
   gender?: string;
-  activities: Activity[];
+  activities?: Activity[];
   avatar?: string;
 }
 
@@ -70,7 +71,10 @@ export const MemberProfile = ({ member, open, onOpenChange }: MemberProfileProps
               "Authorization": `Bearer ${localStorage.getItem("token")}`,
             }
           });
-          setFullMemberData(response.data);
+          setFullMemberData({
+            ...response.data,
+            activities: response.data.activities || []
+          });
         } catch (error: any) {
           toast({
             title: "Error",
@@ -90,14 +94,14 @@ export const MemberProfile = ({ member, open, onOpenChange }: MemberProfileProps
 
   const handleDeactivate = async () => {
     try {
-      await api.put(`/api/members/${member?.id}/`, { status: "Suspended" }, {
+      await api.put(`/api/members/${fullMemberData?.id}/`, { status: "Suspended" }, {
         headers: {
           "Authorization": `Bearer ${localStorage.getItem("token")}`,
         },
       });
       toast({
         title: "Member Deactivated",
-        description: `${member?.name} has been deactivated.`,
+        description: `${fullMemberData?.name} has been deactivated.`,
       });
       onOpenChange(false);
     } catch (error: any) {
@@ -112,7 +116,7 @@ export const MemberProfile = ({ member, open, onOpenChange }: MemberProfileProps
     }
   };
 
-  if (!member || !fullMemberData) return null;
+  if (!fullMemberData) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -124,14 +128,14 @@ export const MemberProfile = ({ member, open, onOpenChange }: MemberProfileProps
         <div className="space-y-6">
           <div className="flex items-start gap-4">
             <Avatar className="h-20 w-20">
-              <AvatarImage src={member.avatar} />
+              <AvatarImage src={fullMemberData.avatar} />
               <AvatarFallback className="text-lg">
-                {member.name.split(' ').map(n => n[0]).join('')}
+                {fullMemberData.name.split(' ').map(n => n[0]).join('')}
               </AvatarFallback>
             </Avatar>
             
             <div className="flex-1">
-              <h3 className="text-2xl font-bold">{member.name}</h3>
+              <h3 className="text-2xl font-bold">{fullMemberData.name}</h3>
               <div className="flex items-center gap-2 mt-1">
                 <Badge variant={fullMemberData.status === 'Active' ? 'default' : 'secondary'}>
                   {fullMemberData.status}
@@ -169,7 +173,7 @@ export const MemberProfile = ({ member, open, onOpenChange }: MemberProfileProps
                 }
               />
               <MessageMemberDialog
-                member={member}
+                member={fullMemberData}
                 trigger={
                   <Button size="sm" variant="outline">
                     <MessageSquare className="h-4 w-4" />

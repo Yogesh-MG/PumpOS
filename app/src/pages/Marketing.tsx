@@ -1,4 +1,6 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -9,6 +11,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { MessageSquare, Mail, Users, Gift, TrendingUp, Send, Calendar, Search, Filter, Plus, Eye, Edit, Share } from "lucide-react";
 
 const Marketing = () => {
+  const { toast } = useToast();
+  const [smsMessage, setSmsMessage] = useState("");
+  const [selectedAudience, setSelectedAudience] = useState("");
   const kpiData = [
     { title: "SMS Campaigns", value: "24", change: "+6", icon: MessageSquare, trend: "up" },
     { title: "Email Open Rate", value: "32.5%", change: "+4.2%", icon: Mail, trend: "up" },
@@ -102,7 +107,12 @@ const Marketing = () => {
                       <CardTitle>SMS Campaigns</CardTitle>
                       <CardDescription>Send targeted SMS messages to members</CardDescription>
                     </div>
-                    <Button>
+                    <Button onClick={() => {
+                      toast({
+                        title: "SMS Campaign",
+                        description: "SMS campaign creation opened!",
+                      });
+                    }}>
                       <Send className="h-4 w-4 mr-2" />
                       Send SMS
                     </Button>
@@ -155,7 +165,7 @@ const Marketing = () => {
                 <CardDescription>Send instant message to members</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Select>
+                <Select value={selectedAudience} onValueChange={setSelectedAudience}>
                   <SelectTrigger>
                     <SelectValue placeholder="Select audience" />
                   </SelectTrigger>
@@ -166,11 +176,34 @@ const Marketing = () => {
                     <SelectItem value="vip">VIP Members</SelectItem>
                   </SelectContent>
                 </Select>
-                <Textarea placeholder="Type your message..." className="min-h-32" />
+                <Textarea 
+                  placeholder="Type your message..." 
+                  className="min-h-32" 
+                  value={smsMessage}
+                  onChange={(e) => setSmsMessage(e.target.value)}
+                />
                 <div className="text-sm text-muted-foreground">
-                  Character count: 0/160
+                  Character count: {smsMessage.length}/160
                 </div>
-                <Button className="w-full">
+                <Button 
+                  className="w-full"
+                  onClick={() => {
+                    if (!selectedAudience || !smsMessage) {
+                      toast({
+                        title: "Missing Information",
+                        description: "Please select audience and enter message",
+                        variant: "destructive"
+                      });
+                      return;
+                    }
+                    toast({
+                      title: "SMS Sent!",
+                      description: `Message sent to ${selectedAudience}`,
+                    });
+                    setSmsMessage("");
+                    setSelectedAudience("");
+                  }}
+                >
                   <Send className="h-4 w-4 mr-2" />
                   Send Message
                 </Button>
@@ -187,7 +220,12 @@ const Marketing = () => {
                   <CardTitle>Email Campaigns</CardTitle>
                   <CardDescription>Create and manage email marketing campaigns</CardDescription>
                 </div>
-                <Button>
+                <Button onClick={() => {
+                  toast({
+                    title: "Email Campaign",
+                    description: "Email campaign creation opened!",
+                  });
+                }}>
                   <Mail className="h-4 w-4 mr-2" />
                   New Email
                 </Button>
@@ -247,7 +285,12 @@ const Marketing = () => {
                       <CardTitle>Referral Tracking</CardTitle>
                       <CardDescription>Monitor member referrals and rewards</CardDescription>
                     </div>
-                    <Button>
+                    <Button onClick={() => {
+                      toast({
+                        title: "Referral Program",
+                        description: "Referral program shared successfully!",
+                      });
+                    }}>
                       <Share className="h-4 w-4 mr-2" />
                       Share Program
                     </Button>
@@ -315,7 +358,15 @@ const Marketing = () => {
                     </SelectContent>
                   </Select>
                 </div>
-                <Button className="w-full">
+                <Button 
+                  className="w-full"
+                  onClick={() => {
+                    toast({
+                      title: "Settings Updated",
+                      description: "Referral program settings have been updated",
+                    });
+                  }}
+                >
                   Update Settings
                 </Button>
               </CardContent>
@@ -335,7 +386,15 @@ const Marketing = () => {
                   <div className="text-3xl font-bold text-primary">12,450</div>
                   <p className="text-sm text-muted-foreground">Total points issued this month</p>
                 </div>
-                <Button className="w-full">
+                <Button 
+                  className="w-full"
+                  onClick={() => {
+                    toast({
+                      title: "Points Issued",
+                      description: "Loyalty points have been issued to members",
+                    });
+                  }}
+                >
                   <Gift className="h-4 w-4 mr-2" />
                   Issue Points
                 </Button>
@@ -379,7 +438,16 @@ const Marketing = () => {
                   <span>Personal Training</span>
                   <span className="text-primary">500 pts</span>
                 </div>
-                <Button variant="outline" className="w-full">
+                <Button 
+                  variant="outline" 
+                  className="w-full"
+                  onClick={() => {
+                    toast({
+                      title: "Rewards Updated",
+                      description: "Reward catalog has been updated",
+                    });
+                  }}
+                >
                   Manage Rewards
                 </Button>
               </CardContent>

@@ -60,7 +60,7 @@ class MessageSerializer(serializers.ModelSerializer):
 
 class MemberSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField(read_only=True)
-    email = serializers.EmailField(source='user.email', read_only=True)
+    email = serializers.EmailField(source='user.email', required=True)
     first_name = serializers.CharField(source='user.first_name', required=False)
     last_name = serializers.CharField(source='user.last_name', required=False)
     membership = serializers.CharField(source='membership_plan.name', allow_null=True, read_only=True)
@@ -83,17 +83,17 @@ class MemberSerializer(serializers.ModelSerializer):
         return f"{obj.user.first_name} {obj.user.last_name}".strip()
 
     def create(self, validated_data):
-        user_data = {
-            'email': validated_data.pop('email'),
-            'first_name': validated_data.pop('first_name', ''),
-            'last_name': validated_data.pop('last_name', ''),
-        }
+        user_data = validated_data.pop('user', {})  # this contains email, first_name, last_name
+        email = user_data.get('email')
+        first_name = user_data.get('first_name', '')
+        last_name = user_data.get('last_name', '')
+
         user = User.objects.create_user(
-            username=user_data['email'],
-            email=user_data['email'],
-            first_name=user_data['first_name'],
-            last_name=user_data['last_name'],
-            password='default_password'  # Set a default or generate a random password
+            username=email,
+            email=email,
+            first_name=first_name,
+            last_name=last_name,
+            password='default_password'
         )
         validated_data['user'] = user
         return super().create(validated_data)

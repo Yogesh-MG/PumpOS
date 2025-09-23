@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Label } from "@/components/ui/label";
 import { 
   User, 
   Mail, 
@@ -18,15 +19,33 @@ import {
   CreditCard
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
+import api from "@/utils/api";
+import { EditMemberDialog } from "./EditMemberDialog";
+import { MessageMemberDialog } from "./MessageMemberDialog";
+
+interface Activity {
+  id: number;
+  type: string;
+  title: string;
+  timestamp: string;
+  duration: string;
+}
 
 interface Member {
-  id: string;
+  id: number;
   name: string;
   email: string;
   phone: string;
-  membershipType: string;
+  membership: string;
+  join_date: string;
   status: string;
-  joinDate: string;
+  address?: string;
+  emergency_contact?: string;
+  emergency_phone?: string;
+  date_of_birth?: string;
+  gender?: string;
+  activities?: Activity[];
   avatar?: string;
 }
 
@@ -38,22 +57,66 @@ interface MemberProfileProps {
 
 export const MemberProfile = ({ member, open, onOpenChange }: MemberProfileProps) => {
   const { toast } = useToast();
-  
-  if (!member) return null;
+  const navigate = useNavigate();
+  const [fullMemberData, setFullMemberData] = useState<Member | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleAction = (action: string) => {
-    toast({
-      title: `${action} Initiated`,
-      description: `${action} for ${member.name} has been processed.`,
-    });
+  useEffect(() => {
+    if (open && member) {
+      const fetchMemberData = async () => {
+        setIsLoading(true);
+        try {
+          const response = await api.get(`/api/members/${member.id}/`, {
+            headers: {
+              "Authorization": `Bearer ${localStorage.getItem("token")}`,
+            }
+          });
+          setFullMemberData({
+            ...response.data,
+            activities: response.data.activities || []
+          });
+        } catch (error: any) {
+          toast({
+            title: "Error",
+            description: "Failed to fetch member details.",
+            variant: "destructive",
+          });
+          if (error.response?.status === 401) {
+            navigate("/login");
+          }
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      fetchMemberData();
+    }
+  }, [open, member, toast, navigate]);
+
+  const handleDeactivate = async () => {
+    try {
+      await api.put(`/api/members/${fullMemberData?.id}/`, { status: "Suspended" }, {
+        headers: {
+          "Authorization": `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+      toast({
+        title: "Member Deactivated",
+        description: `${fullMemberData?.name} has been deactivated.`,
+      });
+      onOpenChange(false);
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Failed to deactivate member.",
+        variant: "destructive",
+      });
+      if (error.response?.status === 401) {
+        navigate("/login");
+      }
+    }
   };
 
-  const activityData = [
-    { date: "2024-01-15", activity: "Gym Check-in", time: "07:30 AM" },
-    { date: "2024-01-14", activity: "Group Class - Yoga", time: "06:00 PM" },
-    { date: "2024-01-13", activity: "Personal Training", time: "08:00 AM" },
-    { date: "2024-01-12", activity: "Gym Check-in", time: "07:45 AM" },
-  ];
+  if (!fullMemberData) return null;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -63,58 +126,66 @@ export const MemberProfile = ({ member, open, onOpenChange }: MemberProfileProps
         </DialogHeader>
         
         <div className="space-y-6">
-          {/* Header Section */}
           <div className="flex items-start gap-4">
             <Avatar className="h-20 w-20">
-              <AvatarImage src={member.avatar} />
+              <AvatarImage src={fullMemberData.avatar} />
               <AvatarFallback className="text-lg">
-                {member.name.split(' ').map(n => n[0]).join('')}
+                {fullMemberData.name.split(' ').map(n => n[0]).join('')}
               </AvatarFallback>
             </Avatar>
             
             <div className="flex-1">
-              <h3 className="text-2xl font-bold">{member.name}</h3>
+              <h3 className="text-2xl font-bold">{fullMemberData.name}</h3>
               <div className="flex items-center gap-2 mt-1">
-                <Badge variant={member.status === 'Active' ? 'default' : 'secondary'}>
-                  {member.status}
+                <Badge variant={fullMemberData.status === 'Active' ? 'default' : 'secondary'}>
+                  {fullMemberData.status}
                 </Badge>
-                <Badge variant="outline">{member.membershipType}</Badge>
+                <Badge variant="outline">{fullMemberData.membership}</Badge>
               </div>
               
               <div className="grid grid-cols-2 gap-4 mt-4 text-sm">
                 <div className="flex items-center gap-2">
                   <Mail className="h-4 w-4 text-muted-foreground" />
-                  {member.email}
+                  {fullMemberData.email}
                 </div>
                 <div className="flex items-center gap-2">
                   <Phone className="h-4 w-4 text-muted-foreground" />
-                  {member.phone}
+                  {fullMemberData.phone}
                 </div>
                 <div className="flex items-center gap-2">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  Joined {member.joinDate}
+                  Joined {new Date(fullMemberData.join_date).toLocaleDateString()}
                 </div>
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-muted-foreground" />
-                  New York, NY
+                  {fullMemberData.address || 'N/A'}
                 </div>
               </div>
             </div>
             
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => handleAction("Edit Profile")}>
-                <Edit className="h-4 w-4" />
-              </Button>
-              <Button size="sm" variant="outline" onClick={() => handleAction("Send Message")}>
-                <MessageSquare className="h-4 w-4" />
-              </Button>
-              <Button size="sm" variant="destructive" onClick={() => handleAction("Deactivate")}>
+              <EditMemberDialog 
+                member={fullMemberData}
+                trigger={
+                  <Button size="sm" variant="outline">
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                }
+              />
+              <MessageMemberDialog
+                member={fullMemberData}
+                trigger={
+                  <Button size="sm" variant="outline">
+                    <MessageSquare className="h-4 w-4" />
+                  </Button>
+                }
+              />
+              <Button size="sm" variant="destructive" onClick={handleDeactivate}>
                 <UserX className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          {/* Tabs Section */}
           <Tabs defaultValue="activity" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="activity">Activity</TabsTrigger>
@@ -131,17 +202,23 @@ export const MemberProfile = ({ member, open, onOpenChange }: MemberProfileProps
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-3">
-                    {activityData.map((item, index) => (
-                      <div key={index} className="flex justify-between items-center py-2 border-b last:border-0">
-                        <div>
-                          <p className="font-medium">{item.activity}</p>
-                          <p className="text-sm text-muted-foreground">{item.date}</p>
+                  {isLoading ? (
+                    <div className="text-center text-muted-foreground">Loading activities...</div>
+                  ) : fullMemberData.activities.length === 0 ? (
+                    <div className="text-center text-muted-foreground">No activities found.</div>
+                  ) : (
+                    <div className="space-y-3">
+                      {fullMemberData.activities.map((item) => (
+                        <div key={item.id} className="flex justify-between items-center py-2 border-b last:border-0">
+                          <div>
+                            <p className="font-medium">{item.title}</p>
+                            <p className="text-sm text-muted-foreground">{new Date(item.timestamp).toLocaleDateString()}</p>
+                          </div>
+                          <Badge variant="outline">{new Date(item.timestamp).toLocaleTimeString()}</Badge>
                         </div>
-                        <Badge variant="outline">{item.time}</Badge>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </TabsContent>
@@ -158,19 +235,19 @@ export const MemberProfile = ({ member, open, onOpenChange }: MemberProfileProps
                   <div className="space-y-4">
                     <div className="flex justify-between">
                       <span>Current Plan:</span>
-                      <Badge>{member.membershipType}</Badge>
+                      <Badge>{fullMemberData.membership || 'None'}</Badge>
                     </div>
                     <div className="flex justify-between">
                       <span>Monthly Fee:</span>
-                      <span className="font-semibold">$99.99</span>
+                      <span className="font-semibold">N/A</span> {/* Fetch from backend if available */}
                     </div>
                     <div className="flex justify-between">
                       <span>Next Billing:</span>
-                      <span>Feb 15, 2024</span>
+                      <span>N/A</span> {/* Fetch from backend if available */}
                     </div>
                     <div className="flex justify-between">
                       <span>Payment Method:</span>
-                      <span>**** 1234</span>
+                      <span>N/A</span> {/* Fetch from backend if available */}
                     </div>
                   </div>
                 </CardContent>
@@ -189,23 +266,23 @@ export const MemberProfile = ({ member, open, onOpenChange }: MemberProfileProps
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <Label>Date of Birth</Label>
-                      <p>January 15, 1990</p>
+                      <p>{fullMemberData.date_of_birth ? new Date(fullMemberData.date_of_birth).toLocaleDateString() : 'N/A'}</p>
                     </div>
                     <div>
                       <Label>Gender</Label>
-                      <p>Male</p>
+                      <p>{fullMemberData.gender || 'N/A'}</p>
                     </div>
                     <div>
                       <Label>Emergency Contact</Label>
-                      <p>Jane Doe</p>
+                      <p>{fullMemberData.emergency_contact || 'N/A'}</p>
                     </div>
                     <div>
                       <Label>Emergency Phone</Label>
-                      <p>+1 (555) 987-6543</p>
+                      <p>{fullMemberData.emergency_phone || 'N/A'}</p>
                     </div>
                     <div className="col-span-2">
                       <Label>Address</Label>
-                      <p>123 Main Street, New York, NY 10001</p>
+                      <p>{fullMemberData.address || 'N/A'}</p>
                     </div>
                   </div>
                 </CardContent>
@@ -217,7 +294,3 @@ export const MemberProfile = ({ member, open, onOpenChange }: MemberProfileProps
     </Dialog>
   );
 };
-
-const Label = ({ children }: { children: React.ReactNode }) => (
-  <span className="text-sm font-medium text-muted-foreground">{children}</span>
-);
