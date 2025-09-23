@@ -7,6 +7,7 @@ cd app || exit
 if [ ! -d "node_modules" ]; then
     echo "Installing npm dependencies..."
     npm install || { echo "npm install failed"; exit 1; }
+    npm install axios
 else
     echo "npm dependencies already installed."
 fi
