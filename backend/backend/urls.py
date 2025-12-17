@@ -28,6 +28,7 @@ urlpatterns = [
     path('api/', include("gymnast.urls")),
     path('api/bookings/', include("bookings.urls")),
     path('api/sales/', include("sales.urls")),
-    path('api/staff/', include("staff_management.urls"))
+    path('api/staff/', include("staff_management.urls")),
+    path('', include("app1.urls"))
     
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

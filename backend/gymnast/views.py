@@ -265,82 +265,131 @@ class FaceRecognitionView(APIView):
 
     def __init__(self):
         super().__init__()
-        # Make sure this path is correct
-        self.yolo_model = YOLO('face_model/yolov8n-face.pt')
-        self.known_faces = self.load_known_faces()  # {member_id: embedding}
+        # Initialize MTCNN (Face Detection) and Resnet (Embedding) just like app1
+        self.mtcnn = MTCNN(keep_all=True, device='cpu') 
+        self.resnet = InceptionResnetV1(pretrained='vggface2').eval()
+        self.threshold = 0.6  # Match the threshold from app1
 
-    def load_known_faces(self):
-        known_faces = {}
-        for member in Member.objects.all():
+    def get_known_faces(self):
+        """
+        Loads embeddings directly from the Gymnast Member database.
+        Efficiently converts stored JSON lists back to numpy arrays.
+        """
+        known_encodings = []
+        known_ids = []
+        
+        # specific to Gymnast: We use the stored face_embedding field
+        members = Member.objects.exclude(face_embedding__isnull=True).exclude(face_embedding=[])
+        
+        for member in members:
             if member.face_embedding:
-                known_faces[member.id] = np.array(member.face_embedding)
-        return known_faces
+                # Convert the stored JSON list back to a numpy array
+                encoding = np.array(member.face_embedding, dtype=np.float32)
+                known_encodings.append(encoding)
+                known_ids.append(member.id)
+                
+        return known_encodings, known_ids
 
     def post(self, request):
         try:
-            # --- Handle both file upload and base64 ---
+            # 1. Image Handling (Base64 or File)
             image_file = request.FILES.get('image')
             image_data = request.data.get('image')
+            img_rgb = None
 
             if image_file:
-                image_bytes = image_file.read()
+                image = Image.open(image_file)
+                img_rgb = np.array(image)
             elif image_data:
                 if ',' in image_data:
                     image_data = image_data.split(',')[1]
                 image_bytes = base64.b64decode(image_data)
+                image = Image.open(BytesIO(image_bytes))
+                img_rgb = np.array(image)
             else:
                 return Response({'error': 'No image provided'}, status=400)
 
-            # Convert bytes to OpenCV image
-            nparr = np.frombuffer(image_bytes, np.uint8)
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-            if img is None:
-                return Response({'error': 'Invalid image'}, status=400)
+            # Ensure image is RGB (OpenCV usually reads BGR, PIL reads RGB)
+            # If using cv2.imdecode above it might be BGR, so be careful. 
+            # Since we used PIL.Image.open above, it is likely RGB.
 
-            # --- Detect faces ---
-            results = self.yolo_model(img)
-            if not results[0].boxes:
+            # 2. Detect and Encode Face (Logic from app1 adapted)
+            # Detect faces
+            boxes, _ = self.mtcnn.detect(img_rgb)
+            
+            if boxes is None:
                 return Response({'message': 'No faces detected', 'attendance_updated': False})
 
-            # --- Process the first detected face ---
-            box = results[0].boxes[0].xyxy[0].cpu().numpy()
-            x1, y1, x2, y2 = map(int, box)
-            face = img[y1:y2, x1:x2]
+            # Process the largest face found
+            box = boxes[0]
+            face_img = img_rgb[int(box[1]):int(box[3]), int(box[0]):int(box[2])]
+            
+            if face_img.size == 0:
+                return Response({'message': 'Face too small or invalid', 'attendance_updated': False})
 
-            # --- Extract embedding ---
-            embedding = self.extract_face_embedding(face)
-            confidence = self.recognize_face(embedding)
+            # Resize and normalize for Resnet (standard 160x160)
+            face_img = cv2.resize(face_img, (160, 160))
+            face_img = np.transpose(face_img, (2, 0, 1)).astype(np.float32) / 255.0
+            face_tensor = torch.tensor(face_img).unsqueeze(0)
 
-            # --- Check if we have known faces ---
-            if not self.known_faces:
-                return Response({'error': 'No known faces in database'}, status=400)
+            # Generate embedding
+            with torch.no_grad():
+                current_encoding = self.resnet(face_tensor).detach().numpy().flatten()
 
-            if confidence > 0.6:
-                # Placeholder: select first known member for demo
-                member_id = list(self.known_faces.keys())[0]
+            # 3. Compare with Known Members
+            known_encodings, known_ids = self.get_known_faces()
+            
+            if not known_encodings:
+                return Response({'error': 'No members with face data found'}, status=404)
+
+            # Vectorized distance calculation (Euclidean distance)
+            # Calculate distance between current face and ALL known faces at once
+            distances = np.linalg.norm(known_encodings - current_encoding, axis=1)
+            min_distance_idx = np.argmin(distances)
+            min_distance = distances[min_distance_idx]
+
+            # 4. Update Database (Gymnast Activity Model)
+            if min_distance < self.threshold:
+                matched_member_id = known_ids[min_distance_idx]
+                member = Member.objects.get(id=matched_member_id)
+
+                # Logic: Create a Check-in Activity
+                # Optional: Check if they already checked in recently to prevent spamming
+                last_activity = Activity.objects.filter(member=member).order_by('-timestamp').first()
+                
+                # Simple spam prevention (e.g., 1 minute)
+                if last_activity and (timezone.now() - last_activity.timestamp).total_seconds() < 60:
+                     return Response({
+                        'message': f'Already updated for {member.user.first_name}',
+                        'attendance_updated': False,
+                        'member_name': f"{member.user.first_name} {member.user.last_name}"
+                    })
+
+                # Create the Activity Entry
                 activity = Activity.objects.create(
-                    member_id=member_id,
-                    type='check-in',  # Or 'check-out' based on your logic
-                    confidence=confidence
+                    member=member,
+                    type='check-in', 
+                    title=f"Face Recognition Check-in",
+                    timestamp=timezone.now(),
+                    location="Main Entrance", # Default location
+                    confidence=float(1 - min_distance), # Rough confidence score
+                    duration="0m"
                 )
+                
+                # Update member last visit
+                member.last_visit = timezone.now().date()
+                member.save()
+
                 serializer = ActivitySerializer(activity)
                 return Response({
-                    'message': f'Attendance updated for Member ID {member_id}',
+                    'message': f'Welcome back, {member.user.first_name}!',
                     'attendance_updated': True,
-                    'data': serializer.data
+                    'data': serializer.data,
+                    'member_name': f"{member.user.first_name} {member.user.last_name}"
                 })
             else:
                 return Response({'message': 'Face not recognized', 'attendance_updated': False})
 
         except Exception as e:
+            print(f"Error processing face: {e}")
             return Response({'error': str(e)}, status=500)
-
-    def extract_face_embedding(self, face):
-        # Placeholder: Use MediaPipe, FaceNet, or DeepFace for real embeddings
-        # For demo, return a random 128-d vector
-        return np.random.rand(128).astype(np.float32)
-
-    def recognize_face(self, embedding):
-        # Placeholder: Compare with known embeddings
-        # For demo, return random confidence between 0.5 and 0.95
-        return random.uniform(0.5, 0.95)

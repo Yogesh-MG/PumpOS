@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { UserCheck, Clock, Calendar, TrendingUp, Filter } from "lucide-react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { UserCheck, Clock, Calendar, TrendingUp, Filter, Camera, X } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import api from "@/utils/api";
 
+// --- Interfaces ---
 interface LiveCheckin {
   id: number;
   member: string;
@@ -48,59 +49,140 @@ interface AttendanceData {
 }
 
 export default function Attendance() {
+  // --- Existing State ---
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [data, setData] = useState<AttendanceData>({
     liveCheckins: [],
     attendanceHistory: [],
     currentlyInGym: [],
-    kpi: {
-      todaysCheckins: 0,
-      currentlyInGym: 0,
-      peakHour: 'N/A',
-      avgDuration: '0m',
-    },
+    kpi: { todaysCheckins: 0, currentlyInGym: 0, peakHour: 'N/A', avgDuration: '0m' },
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // --- New Kiosk Mode State ---
+  const [isKioskMode, setIsKioskMode] = useState(false);
+  const [scanStatus, setScanStatus] = useState("Waiting for member...");
+  const [lastScannedMember, setLastScannedMember] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
   const { toast } = useToast();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchAttendanceData = async () => {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const response = await api.get(`/api/attendance-summary/?date=${selectedDate}`, {
-          headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
-        });
-        setData({
-          liveCheckins: Array.isArray(response.data.liveCheckins) ? response.data.liveCheckins : [],
-          attendanceHistory: Array.isArray(response.data.attendanceHistory) ? response.data.attendanceHistory : [],
-          currentlyInGym: Array.isArray(response.data.currentlyInGym) ? response.data.currentlyInGym : [],
-          kpi: response.data.kpi || {
-            todaysCheckins: 0,
-            currentlyInGym: 0,
-            peakHour: 'N/A',
-            avgDuration: '0m',
-          },
-        });
-      } catch (error: any) {
-        setError('Failed to fetch attendance data.');
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch attendance data. Please try again.',
-          variant: 'destructive',
-        });
-        if (error.response?.status === 401) {
-          navigate('/login');
-        }
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    fetchAttendanceData();
-  }, [selectedDate, toast, navigate]);
+  // --- 1. Fetch Dashboard Data (Existing Logic) ---
+  const fetchAttendanceData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await api.get(`/api/attendance-summary/?date=${selectedDate}`);
+      setData({
+        liveCheckins: Array.isArray(response.data.liveCheckins) ? response.data.liveCheckins : [],
+        attendanceHistory: Array.isArray(response.data.attendanceHistory) ? response.data.attendanceHistory : [],
+        currentlyInGym: Array.isArray(response.data.currentlyInGym) ? response.data.currentlyInGym : [],
+        kpi: response.data.kpi || { todaysCheckins: 0, currentlyInGym: 0, peakHour: 'N/A', avgDuration: '0m' },
+      });
+    } catch (error: any) {
+      setError('Failed to fetch attendance data.');
+      if (error.response?.status === 401) navigate('/login');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [selectedDate, navigate]);
 
+  useEffect(() => {
+    if (!isKioskMode) {
+      fetchAttendanceData();
+    }
+  }, [fetchAttendanceData, isKioskMode]);
+
+  // --- 2. Kiosk/Camera Logic (New) ---
+
+  // Start Camera
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        streamRef.current = stream;
+      }
+    } catch (err) {
+      console.error("Camera error:", err);
+      toast({ title: "Camera Error", description: "Could not access webcam.", variant: "destructive" });
+      setIsKioskMode(false); // Exit if camera fails
+    }
+  };
+
+  // Stop Camera
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+  };
+
+  // Toggle Kiosk Mode
+  useEffect(() => {
+    if (isKioskMode) {
+      startCamera();
+    } else {
+      stopCamera();
+    }
+    return () => stopCamera(); // Cleanup on unmount
+  }, [isKioskMode]);
+
+  // Capture & Send Loop
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+
+    if (isKioskMode) {
+      interval = setInterval(async () => {
+        if (videoRef.current && canvasRef.current) {
+          const context = canvasRef.current.getContext('2d');
+          if (context) {
+            // Draw video frame to hidden canvas
+            context.drawImage(videoRef.current, 0, 0, 640, 480);
+            const imageSrc = canvasRef.current.toDataURL('image/jpeg');
+
+            // Send to Backend
+            try {
+              // NOTE: Update URL if your backend path is different
+              const response = await api.post('/api/face-recognition/', { image: imageSrc });
+
+              if (response.data.attendance_updated) {
+                const memberName = response.data.member_name || "Member";
+                
+                // Only toast if it's a new person or some time has passed (simple debounce UI)
+                if (lastScannedMember !== memberName) {
+                  setScanStatus(`Welcome, ${memberName}!`);
+                  setLastScannedMember(memberName);
+                  toast({
+                    title: "Check-in Successful",
+                    description: `Welcome back, ${memberName}`,
+                    className: "bg-green-100 border-green-500 text-green-900"
+                  });
+                  
+                  // Clear "last scanned" after 5 seconds so they can scan again if needed
+                  setTimeout(() => setLastScannedMember(null), 5000);
+                }
+              } else {
+                 // Reset status if no one found
+                 if (!lastScannedMember) setScanStatus("Scanning...");
+              }
+            } catch (err) {
+              console.error("Scan error", err);
+            }
+          }
+        }
+      }, 2000); // Scan every 2 seconds
+    }
+
+    return () => clearInterval(interval);
+  }, [isKioskMode, lastScannedMember, toast]);
+
+
+  // --- Helper Functions (Existing) ---
   const getConfidenceColor = (confidence: number | undefined) => {
     if (confidence === undefined) return 'bg-muted text-muted-foreground';
     if (confidence >= 95) return 'bg-success/10 text-success';
@@ -108,23 +190,72 @@ export default function Attendance() {
     return 'bg-destructive/10 text-destructive';
   };
 
-  const getTypeIcon = (type: string) => {
-    return type === 'check-in' ? '→' : '←';
-  };
+  const getTypeIcon = (type: string) => (type === 'check-in' ? '→' : '←');
 
-  const getTypeBadge = (type: string) => {
-    return type === 'check-in' ? (
-      <Badge className="bg-success/10 text-success">Check In</Badge>
-    ) : (
-      <Badge className="bg-info/10 text-info">Check Out</Badge>
+  const getTypeBadge = (type: string) => (
+    type === 'check-in' 
+      ? <Badge className="bg-success/10 text-success">Check In</Badge> 
+      : <Badge className="bg-info/10 text-info">Check Out</Badge>
+  );
+
+  // --- 3. Render View ---
+
+  // KIOSK VIEW
+  if (isKioskMode) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[calc(100vh-100px)] bg-black/90 p-6 rounded-xl relative">
+        <Button 
+          variant="secondary" 
+          className="absolute top-4 right-4 z-50"
+          onClick={() => setIsKioskMode(false)}
+        >
+          <X className="mr-2 h-4 w-4" /> Exit Kiosk
+        </Button>
+
+        <Card className="w-full max-w-2xl border-none bg-transparent shadow-none">
+          <CardHeader className="text-center text-white">
+            <CardTitle className="text-4xl">Face Attendance</CardTitle>
+            <CardDescription className="text-gray-400 text-lg">Please look at the camera to check in</CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col items-center space-y-6">
+            <div className="relative border-4 border-primary/50 rounded-xl overflow-hidden shadow-2xl shadow-primary/20">
+              <video 
+                ref={videoRef} 
+                autoPlay 
+                muted 
+                playsInline
+                className="w-[640px] h-[480px] object-cover"
+              />
+              {/* Overlay scanning line animation could go here */}
+              <div className="absolute inset-0 border-2 border-white/20 rounded-xl pointer-events-none" />
+            </div>
+            
+            <div className="text-center space-y-2">
+              <Badge variant="outline" className="text-xl px-6 py-2 bg-white/10 text-white border-none">
+                {scanStatus}
+              </Badge>
+            </div>
+
+            {/* Hidden Canvas for Processing */}
+            <canvas ref={canvasRef} width="640" height="480" className="hidden" />
+          </CardContent>
+        </Card>
+      </div>
     );
-  };
+  }
 
+  // DASHBOARD VIEW (Original)
   return (
     <div className="flex-1 space-y-6 p-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Attendance</h1>
         <div className="flex items-center space-x-2">
+          {/* New Kiosk Button */}
+          <Button onClick={() => setIsKioskMode(true)} className="bg-primary hover:bg-primary/90">
+            <Camera className="mr-2 h-4 w-4" />
+            Kiosk Mode
+          </Button>
+
           <Button variant="outline" disabled={isLoading}>
             <Filter className="mr-2 h-4 w-4" />
             Filter
@@ -226,7 +357,7 @@ export default function Attendance() {
                       <div className="flex items-center space-x-2">
                         {getTypeBadge(checkin.type)}
                         <Badge variant="secondary" className={getConfidenceColor(checkin.confidence)}>
-                          {checkin.confidence ? `${checkin.confidence}% confidence` : 'N/A'}
+                          {checkin.confidence ? `${checkin.confidence}%` : 'N/A'}
                         </Badge>
                         <span className="text-xl font-mono">{getTypeIcon(checkin.type)}</span>
                       </div>

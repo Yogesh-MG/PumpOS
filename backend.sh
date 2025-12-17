@@ -1,7 +1,7 @@
 echo -e "\033[0;32mStarting backend server...\033[0m"
-source env/scripts/activate
+source "C:/Users/yoge8/OneDrive/Desktop/Major project/medical-editable/env/scripts/activate"
 echo -e "\033[0;32mActivated virtual environment.\033[0m"
-
+pip freeze > requirements.txt
 echo -e "\033[0;32mNavigating to pumpos-backend directory...\033[0m"
 cd backend
 

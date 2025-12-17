@@ -17,7 +17,7 @@ import Marketing from "./pages/Marketing";
 import Staff from "./pages/Staff";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
-
+import FaceRecognition from "./components/FaceAttendance";
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -27,6 +27,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <Routes>
+          <Route path="/attendance-kiosk" element={<FaceRecognition />} />
           <Route path="/" element={<Hero />} />
           <Route path="/login" element={<Login />} />
           <Route path="/dashboard" element={

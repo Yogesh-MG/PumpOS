@@ -25,5 +25,5 @@ _.apk
 *.njsproj
 *.sln
 *.sw?
-.env
+
 /android

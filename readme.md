@@ -9,7 +9,7 @@ In The Bash terminal Run the following commands to run the application
 ```
 
 ## Using docker-compose
-Step 1: Build The Mtorch 
+Step 1: Build The Mtorch (This process gonna take time wait patiently)
 ```bash
 docker build -t mtorch:latest .
 ```
@@ -23,3 +23,4 @@ Step 3: Build the docker compose
 ```bash
 docker-compose up --build
 ```
+Visit http:/localhost
